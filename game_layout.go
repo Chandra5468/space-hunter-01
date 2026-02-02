@@ -4,14 +4,23 @@ import (
 	"image/color"
 
 	"github.com/hajimehoshi/ebiten/v2"
-	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
+	"github.com/hajimehoshi/ebiten/v2/vector"
 )
 
 const playerSpeed = 4
 
+type spaceshipDimensions float64
+
+const (
+	sshipWidth  spaceshipDimensions = 40.0
+	sshipHeight spaceshipDimensions = 40.0
+)
+
 type Game struct { // storing state.
 	playerX float64 // player x position : horizontal position
 	playerY float64 // player y position : vertical position
+
+	bullets []Bullet // slice becoz : multiple bullets, dynamic add/remove
 }
 
 // Update runs at 60 times/sec by ebiten
@@ -31,26 +40,48 @@ func (g *Game) Update() error {
 
 	g.clampPlayer()
 
+	// fire an bullet on space (update)
+	if ebiten.IsKeyPressed(ebiten.KeySpace) {
+		g.bullets = append(g.bullets, Bullet{
+			x: g.playerX + float64(sshipWidth)/2 - 2, // width of aeroplane is 40 assuming
+			y: g.playerY,
+		})
+	}
+
+	// move bullets logic (always)
+	for i := range g.bullets {
+		g.bullets[i].y -= 8
+	}
+
+	// remove/clean bullets off screen
+	activeBullets := g.bullets[:0]
+	for _, b := range g.bullets {
+		if b.y > 0 {
+			activeBullets = append(activeBullets, b)
+		}
+	}
+
+	g.bullets = activeBullets
+
 	return nil
 }
 
-func (g *Game) Draw(screen *ebiten.Image) { // every frame
-	ebitenutil.DrawRect(
+// every frame
+func (g *Game) Draw(screen *ebiten.Image) {
+	vector.FillRect(
 		screen,
-		g.playerX,
-		g.playerY,
-		40,
-		40,
+		float32(g.playerX),
+		float32(g.playerY),
+		float32(sshipWidth),
+		float32(sshipHeight),
 		color.White,
+		true,
 	)
-	// vector.FillRect(
-	// 	screen,
-	// 	float32(g.playerX),
-	// 	float32(g.playerY),
-	// 	40,
-	// 	40,
-	// 	color.White,
-	// )
+
+	// now bullets will appear every frame
+	for i := range g.bullets {
+		g.bullets[i].Draw(screen)
+	}
 }
 
 // This is Game world size
