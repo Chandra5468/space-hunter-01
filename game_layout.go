@@ -2,6 +2,7 @@ package main
 
 import (
 	"image/color"
+	"math/rand"
 
 	"github.com/hajimehoshi/ebiten/v2"
 	"github.com/hajimehoshi/ebiten/v2/vector"
@@ -20,11 +21,47 @@ type Game struct { // storing state.
 	playerX float64 // player x position : horizontal position
 	playerY float64 // player y position : vertical position
 
-	bullets []Bullet // slice becoz : multiple bullets, dynamic add/remove
+	bullets   []Bullet // slice becoz : multiple bullets, dynamic add/remove
+	asteroids []Asteroid
+
+	fireCoolDown          int // if user presses on space, a lot of bullets are launched. Cool it down
+	asteroidSpawnCooldown int
 }
 
 // Update runs at 60 times/sec by ebiten
 func (g *Game) Update() error {
+
+	if g.asteroidSpawnCooldown > 0 {
+		g.asteroidSpawnCooldown--
+	}
+
+	if g.asteroidSpawnCooldown == 0 {
+		g.asteroids = append(g.asteroids, Asteroid{
+			x:     float64(rand.Intn(760) + 20),
+			y:     -20,
+			speed: float64(rand.Intn(3)+1) + 1,
+			mass:  rand.Intn(20) + 20,
+		})
+
+		g.asteroidSpawnCooldown = asteroidSpawnRate
+	}
+
+	// Move asteroids
+	for i := range g.asteroids {
+		g.asteroids[i].y += g.asteroids[i].speed
+	}
+
+	// Remove off screen asteroids
+	// activeAsteroids := g.asteroids[:0]
+
+	// for _, a := range g.asteroids {
+	// 	if a.y < 620 {
+	// 		activeAsteroids = append(activeAsteroids, a)
+	// 	}
+	// }
+
+	// g.asteroids = activeAsteroids
+
 	if ebiten.IsKeyPressed(ebiten.KeyArrowLeft) || ebiten.IsKeyPressed(ebiten.KeyA) {
 		g.playerX -= playerSpeed
 	}
@@ -40,17 +77,41 @@ func (g *Game) Update() error {
 
 	g.clampPlayer()
 
+	// decrease cooldown every frame
+	if g.fireCoolDown > 0 {
+		g.fireCoolDown--
+	}
+
 	// fire an bullet on space (update)
-	if ebiten.IsKeyPressed(ebiten.KeySpace) {
+	if ebiten.IsKeyPressed(ebiten.KeySpace) && g.fireCoolDown == 0 {
 		g.bullets = append(g.bullets, Bullet{
 			x: g.playerX + float64(sshipWidth)/2 - 2, // width of aeroplane is 40 assuming
 			y: g.playerY,
 		})
+		g.fireCoolDown = bulletCooldown // shooting feels controlled and professional
 	}
 
 	// move bullets logic (always)
 	for i := range g.bullets {
 		g.bullets[i].y -= 8
+	}
+
+	for ai := range g.asteroids {
+		a := &g.asteroids[ai]
+
+		for bi := range g.bullets {
+			b := &g.bullets[bi]
+
+			if b.y < 0 {
+				continue // already dead
+			}
+
+			if bulletHitsAsteroid(*b, *a) {
+				a.mass -= 5
+				b.y = -1000 // mark bullet as dead
+				break       // one bullet per asteroid per frame
+			}
+		}
 	}
 
 	// remove/clean bullets off screen
@@ -63,6 +124,15 @@ func (g *Game) Update() error {
 
 	g.bullets = activeBullets
 
+	activeAsteroids := g.asteroids[:0]
+	for _, a := range g.asteroids {
+		if a.mass > 0 || a.y < 620 {
+			activeAsteroids = append(activeAsteroids, a)
+		}
+	}
+	g.asteroids = activeAsteroids
+
+	// handle collision of bullets and asteroids
 	return nil
 }
 
@@ -81,6 +151,11 @@ func (g *Game) Draw(screen *ebiten.Image) {
 	// now bullets will appear every frame
 	for i := range g.bullets {
 		g.bullets[i].Draw(screen)
+	}
+
+	// draw asteroids
+	for i := range g.asteroids {
+		g.asteroids[i].Draw(screen)
 	}
 }
 

@@ -2,11 +2,14 @@ package main
 
 import (
 	"log"
+	"math/rand"
+	"time"
 
 	"github.com/hajimehoshi/ebiten/v2"
 )
 
 func main() {
+	rand.Seed(time.Now().UnixNano())
 	game := &Game{
 		playerX: 800 / 2,
 		playerY: 600 / 2,
