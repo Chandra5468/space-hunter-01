@@ -50,6 +50,9 @@ func (g *Game) Update() error {
 	*/
 
 	if g.gameOver {
+		if g.gameOver && ebiten.IsKeyPressed(ebiten.KeyR) {
+			g.reset()
+		}
 		return nil
 	}
 
@@ -71,6 +74,14 @@ func (g *Game) Update() error {
 	// Move asteroids
 	for i := range g.asteroids {
 		g.asteroids[i].y += g.asteroids[i].speed
+	}
+
+	// asteroid movement
+	for _, a := range g.asteroids {
+		if playerHitsAsteroid(g.playerX, g.playerY, a) {
+			g.gameOver = true
+			return nil
+		}
 	}
 
 	// Move spaceship
@@ -149,9 +160,6 @@ func (g *Game) Update() error {
 	}
 	g.asteroids = activeAsteroids
 
-	if g.gameOver && ebiten.IsKeyPressed(ebiten.KeyR) {
-		g.reset()
-	}
 	return nil
 }
 
