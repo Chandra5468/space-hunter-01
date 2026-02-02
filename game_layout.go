@@ -5,6 +5,7 @@ import (
 	"math/rand"
 
 	"github.com/hajimehoshi/ebiten/v2"
+	"github.com/hajimehoshi/ebiten/v2/audio"
 	"github.com/hajimehoshi/ebiten/v2/ebitenutil"
 )
 
@@ -32,6 +33,9 @@ type Game struct { // storing state.
 
 	shipImage     *ebiten.Image
 	asteroidImage *ebiten.Image
+
+	audioCtx   *audio.Context
+	laserSound *audio.Player
 }
 
 // Update runs at 60 times/sec by ebiten
@@ -112,6 +116,7 @@ func (g *Game) Update() error {
 			y: g.playerY,
 		})
 		g.fireCoolDown = bulletCooldown // shooting feels controlled and professional
+		playSound(g.laserSound)
 	}
 
 	// move bullets logic (always)
