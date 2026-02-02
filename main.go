@@ -16,6 +16,9 @@ func main() {
 		bullets: []Bullet{}, // can omit it. Go can append on nil slice.
 	}
 
+	game.shipImage = loadImage("assets/playerShip3_orange.png")
+	game.asteroidImage = loadImage("assets/meteorBrown_big4.png")
+
 	ebiten.SetWindowSize(800, 600) // this sets the window size
 	ebiten.SetWindowTitle("Space hunter")
 
