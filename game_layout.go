@@ -18,6 +18,11 @@ const (
 	sshipHeight spaceshipDimensions = 40.0
 )
 
+const (
+	baseAsteroidSpawnRate = 90 // frames (~1.5s)
+	minAsteroidSpawnRate  = 25 // cap difficulty
+)
+
 type Game struct { // storing state.
 	playerX float64 // player x position : horizontal position
 	playerY float64 // player y position : vertical position
@@ -36,6 +41,13 @@ type Game struct { // storing state.
 
 	audioCtx   *audio.Context
 	laserSound *audio.Player
+
+	// background
+	starImage *ebiten.Image
+	moonImage *ebiten.Image
+
+	starOffset float64
+	moonOffset float64
 }
 
 // Update runs at 60 times/sec by ebiten
@@ -60,19 +72,31 @@ func (g *Game) Update() error {
 		return nil
 	}
 
+	g.starOffset += 0.5 // fast layer
+	g.moonOffset += 0.1 // slow layer
+
+	if g.starOffset > 600 {
+		g.starOffset = 0
+	}
+	if g.moonOffset > 600 {
+		g.moonOffset = 0
+	}
+
 	if g.asteroidSpawnCooldown > 0 {
 		g.asteroidSpawnCooldown--
 	}
 
 	if g.asteroidSpawnCooldown == 0 {
 		g.asteroids = append(g.asteroids, Asteroid{
-			x:     float64(rand.Intn(760) + 20),
-			y:     -20,
-			speed: float64(rand.Intn(3)+1) + 1,
+			x: float64(rand.Intn(760) + 20),
+			y: -20,
+			// speed: float64(rand.Intn(3)+1) + 1,
+			speed: float64(rand.Intn(3)+1) + 1 + float64(g.score)/500,
 			mass:  rand.Intn(20) + 20,
 		})
 
-		g.asteroidSpawnCooldown = asteroidSpawnRate
+		// g.asteroidSpawnCooldown = asteroidSpawnRate
+		g.asteroidSpawnCooldown = g.currentAsteroidSpawnRate()
 	}
 
 	// Move asteroids
@@ -111,9 +135,14 @@ func (g *Game) Update() error {
 
 	// fire an bullet on space (update)
 	if ebiten.IsKeyPressed(ebiten.KeySpace) && g.fireCoolDown == 0 {
+		// g.bullets = append(g.bullets, Bullet{
+		// 	x: g.playerX + float64(sshipWidth)/2 - 2, // width of aeroplane is 40 assuming
+		// 	y: g.playerY,
+		// })
+		cx, cy := g.shipCenter()
 		g.bullets = append(g.bullets, Bullet{
-			x: g.playerX + float64(sshipWidth)/2 - 2, // width of aeroplane is 40 assuming
-			y: g.playerY,
+			x: cx - 2,
+			y: cy,
 		})
 		g.fireCoolDown = bulletCooldown // shooting feels controlled and professional
 		playSound(g.laserSound)
@@ -171,6 +200,9 @@ func (g *Game) Update() error {
 // every frame
 func (g *Game) Draw(screen *ebiten.Image) {
 
+	drawTiledY(screen, g.starImage, g.starOffset)
+	// drawMoon(screen, g.moonImage, g.moonOffset)
+
 	// to see score increasing live
 	ebitenutil.DebugPrint(
 		screen,
@@ -186,20 +218,12 @@ func (g *Game) Draw(screen *ebiten.Image) {
 		return
 	}
 
-	// vector.FillRect(
-	// 	screen,
-	// 	float32(g.playerX),
-	// 	float32(g.playerY),
-	// 	float32(sshipWidth),
-	// 	float32(sshipHeight),
-	// 	color.White,
-	// 	true,
-	// )
-	// Instead of fill Rect we will load spaceship image
 	op := &ebiten.DrawImageOptions{}
-	shipW, shipH := g.shipImage.Size()
+	// shipW, shipH := g.shipImage.Size()
+	shipW, shipH := g.shipImage.Bounds().Dx(), g.shipImage.Bounds().Dy()
 	// g.shipImage.Bounds()
-
+	scale := 0.5
+	op.GeoM.Scale(scale, scale)
 	op.GeoM.Translate(
 		g.playerX-float64(shipW)/2,
 		g.playerY-float64(shipH)/2,
@@ -226,18 +250,35 @@ func (g *Game) Layout(outsideWidth, outsideHeight int) (int, int) {
 }
 
 func (g *Game) clampPlayer() {
-	if g.playerX < 0 {
-		g.playerX = 0
-	}
-	if g.playerX > 800-40 {
-		g.playerX = 800 - 40
+	halfW := float64(g.shipImage.Bounds().Dx()) * 0.5 * 0.5
+	halfH := float64(g.shipImage.Bounds().Dy()) * 0.5 * 0.5
+
+	// if g.playerX < 0 {
+	// 	g.playerX = 0
+	// }
+	if g.playerX < halfW {
+		g.playerX = halfW
 	}
 
-	if g.playerY < 0 {
-		g.playerY = 0
+	// if g.playerX > 800-40 {
+	// 	g.playerX = 800 - 40
+	// }
+	if g.playerX > 800-halfW {
+		g.playerX = 800 - halfW
 	}
-	if g.playerY > 600-40 {
-		g.playerY = 600 - 40
+
+	// if g.playerY < 0 {
+	// 	g.playerY = 0
+	// }
+	// if g.playerY > 600-40 {
+	// 	g.playerY = 600 - 40
+	// }
+
+	if g.playerY < halfH {
+		g.playerY = halfH
+	}
+	if g.playerY > 600-halfH {
+		g.playerY = 600 - halfH
 	}
 }
 
@@ -250,4 +291,40 @@ func (g *Game) reset() {
 	g.playerX = 800 / 2
 	g.playerY = 600 / 2
 	g.gameOver = false
+}
+
+func (g *Game) shipCenter() (float64, float64) {
+	w := float64(g.shipImage.Bounds().Dx()) * 0.5
+	h := float64(g.shipImage.Bounds().Dy()) * 0.5
+
+	return g.playerX - w/2, g.playerY - h/2
+}
+
+func (g *Game) currentAsteroidSpawnRate() int {
+	rate := baseAsteroidSpawnRate - (g.score / 200)
+	if rate < minAsteroidSpawnRate {
+		return minAsteroidSpawnRate
+	}
+	return rate
+}
+
+func drawTiledY(screen *ebiten.Image, img *ebiten.Image, offset float64) {
+	_, h := img.Bounds().Dx(), img.Bounds().Dy()
+
+	for y := -h; y < 600+h; y += h {
+		op := &ebiten.DrawImageOptions{}
+		op.GeoM.Translate(0, float64(y)+offset)
+		screen.DrawImage(img, op)
+	}
+}
+
+func drawMoon(screen *ebiten.Image, img *ebiten.Image, offset float64) {
+	op := &ebiten.DrawImageOptions{}
+
+	w, _ := img.Bounds().Dx(), img.Bounds().Dy()
+
+	x := 800/2 - w/2
+
+	op.GeoM.Translate(float64(x), offset-200)
+	screen.DrawImage(img, op)
 }

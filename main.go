@@ -22,6 +22,9 @@ func main() {
 	game.shipImage = loadImage("assets/playerShip3_orange.png")
 	game.asteroidImage = loadImage("assets/meteorBrown_big4.png")
 	game.laserSound = loadSound(audioCtx, "assets/laser9.ogg")
+	// Background images
+	game.starImage = loadImage("assets/stars_bg.png")
+	game.moonImage = loadImage("assets/moon.png")
 
 	ebiten.SetWindowSize(800, 600) // this sets the window size
 	ebiten.SetWindowTitle("Space hunter")
